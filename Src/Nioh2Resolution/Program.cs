@@ -8,49 +8,24 @@ using Steamless.API.Model;
 using Steamless.API.Services;
 using Steamless.Unpacker.Variant31.x64;
 
-namespace NiohResolution
+namespace Nioh2Resolution
 {
     public class Program
     {
-        private const string EXE_FILE = "nioh.exe";
-        private const string EXE_FILE_BACKUP = "nioh.exe.backup.exe";
-        private const string EXE_FILE_UNPACKED = "nioh.exe.unpacked.exe";
-
-        private const string PATTERN_ASPECTRATIO1 = "C7 43 50 39 8E E3 3F";
-        private const int PATTERN_ASPECTRATIO1_OFFSET = 3;
-
-        private const string PATTERN_ASPECTRATIO2 = "00 00 87 44 00 00 F0 44";
-
-        private const string PATTERN_MAGIC1 = "0F 95 C0 88 46 34";
-        private const string PATTERN_MAGIC1_PATCH = "32 C0 90 88 46 34";
-
-        private const string PATTERN_MAGIC2_A = "45 85 D2 7E 1A";
-        private const string PATTERN_MAGIC2_A_PATCH = "45 85 D2 EB 1A";
-
-        private const string PATTERN_MAGIC2_B = "C3 79 14";
-        private const string PATTERN_MAGIC2_B_PATCH = "C3 EB 14";
-
-        private const string PATTERN_RESOLUTION = "80 07 00 00 38 04 00 00";
+        private const string EXE_FILE = "nioh2.exe";
+        private const string EXE_FILE_BACKUP = "nioh2.exe.backup.exe";
+        private const string EXE_FILE_UNPACKED = "nioh2.exe.unpacked.exe";
 
         public static void Main(string[] args)
         {
             Thread.CurrentThread.CurrentCulture = new CultureInfo("en-US");
 
-            Console.WriteLine("Welcome to the Nioh Resolution patcher!");
+            Console.WriteLine("Welcome to the Nioh 2 Resolution patcher!");
 
             Console.WriteLine("\nPlease enter your desired resolution.\n");
 
-            int width = ReadInt("Width", 1920);
-            int height = ReadInt("Height", 1080);
-
-            Console.WriteLine("\nPlease enter a scale for your desired render resolution.\n");
-            Console.WriteLine("Keep in mind that this scale:");
-            Console.WriteLine("- Has no effect on the entered resolution.");
-            Console.WriteLine("- Has no effect on the in-game UI.");
-            Console.WriteLine("- Can be less than 1.0 to increase performance.");
-            Console.WriteLine();
-
-            float scale = ReadFloat("Scale", 1.0f);
+            int width = ReadInt("Width", 3440);
+            int height = ReadInt("Height", 1440);
 
             if (File.Exists(EXE_FILE_BACKUP))
             {
@@ -81,11 +56,11 @@ namespace NiohResolution
                 File.Copy(EXE_FILE, EXE_FILE_UNPACKED, true);
             }
 
-            Console.WriteLine($"\nPatching resolution to {width}x{height} with scale set to {scale:F1}...");
+            Console.WriteLine($"\nPatching resolution to {width}x{height}...");
 
             var buffer = File.ReadAllBytes(EXE_FILE_UNPACKED);
 
-            result = PatchExe(ref buffer, width, height, scale);
+            result = PatchExe(ref buffer, width, height);
             if (!result)
             {
                 Console.WriteLine("\nPatching failed, consider restoring a backup and try again.");
@@ -97,24 +72,6 @@ namespace NiohResolution
                 return;
             }
 
-            Console.WriteLine("\nAn experimental patch for the aspect ratio of FMV's is available.\n");
-
-            if (ReadBool("Do you want to apply this patch?", false))
-            {
-                Console.WriteLine("\nPatching FMV's...");
-
-                byte[] bufferCopy = buffer.ToArray();
-                result = PatchFMV(ref bufferCopy);
-                if (result)
-                {
-                    buffer = bufferCopy;
-                }
-                else
-                {
-                    Console.WriteLine("-> Patching failed, rolling back changes...");
-                }
-            }
-            
             Console.WriteLine($"\nBacking up {EXE_FILE}...");
 
             File.Copy(EXE_FILE, EXE_FILE_BACKUP, true);
@@ -124,9 +81,7 @@ namespace NiohResolution
             File.WriteAllBytes(EXE_FILE, buffer);
             File.Delete(EXE_FILE_UNPACKED);
 
-            Console.WriteLine("\nDone! Don't forget to apply the following changes in the launcher:");
-            Console.WriteLine("- Set the Render Resolution to High");
-            Console.WriteLine("- Set the Resolution to 1920x1080");
+            Console.WriteLine("\nDone! Don't forget to set the game resolution to 3440x1440 (you can also do it from the config).");
 
             Exit();
         }
@@ -146,8 +101,6 @@ namespace NiohResolution
 
             if (!result)
             {
-                Console.WriteLine($"-> Cannot process {EXE_FILE}!");
-
                 return false;
             }
 
@@ -167,17 +120,35 @@ namespace NiohResolution
             return true;
         }
 
-        private static bool PatchExe(ref byte[] buffer, int width, int height, float scale)
+        private static bool PatchExe(ref byte[] buffer, int width, int height)
         {
-            return
-                PatchAspectRatio(ref buffer, width, height) &&
-                PatchResolution(ref buffer, width, height, scale);
+            return PatchAspectRatio(ref buffer, width, height) && PatchResolution(ref buffer, width, height);
         }
 
+        // Patching of Aspect Ratio has been disabled as it does not seem strictly necessary.
+        // UI scales decently (not perfectly as some things end up scaled uncorrectly or anchored to wrong places,
+        // but overall it's decent, so for now just keep this off, until someone can bother to actually find the hex values.
         //Source: http://www.wsgf.org/forums/viewtopic.php?f=64&t=32376&start=110
         private static bool PatchAspectRatio(ref byte[] buffer, int width, int height)
         {
+            // These values are from Nioh 1
+            const string PATTERN_ASPECTRATIO1 = "C7 43 50 39 8E E3 3F";
+            const int PATTERN_ASPECTRATIO1_OFFSET = 3;
+
+            const string PATTERN_ASPECTRATIO2 = "00 00 87 44 00 00 F0 44";
+
+            const string PATTERN_MAGIC1 = "0F 95 C0 88 46 34";
+            const string PATTERN_MAGIC1_PATCH = "32 C0 90 88 46 34";
+
+            const string PATTERN_MAGIC2_A = "45 85 D2 7E 1A";
+            const string PATTERN_MAGIC2_A_PATCH = "45 85 D2 EB 1A";
+
+            const string PATTERN_MAGIC2_B = "C3 79 14";
+            const string PATTERN_MAGIC2_B_PATCH = "C3 EB 14";
+
             float ratio = width / (float)height;
+            double doubleRatio = width / (double)height;
+            double ratio_16_9 = 1920.0 / 1080.0;
             float ratioWidth = 1920;
             float ratioHeight = 1080;
 
@@ -190,18 +161,39 @@ namespace NiohResolution
                 ratioWidth = ratioHeight * ratio;
             }
 
+            //To review: There seems to be a double hardcoded as 16:9 in the code, but
+            /*//changing it seems to have no effect. Better leave it alone.
+            //While for float 16:9, there are like 40 hardcoded instances.
             //Aspect Ratio Fix #1
-            var positions = FindSequence(ref buffer, StringToPattern(PATTERN_ASPECTRATIO1), 0);
+            var positions = FindSequence(ref buffer, ConvertToBytes(ratio_16_9), 0);
 
-            if (!AssertEquals(nameof(PATTERN_ASPECTRATIO1), 1, positions.Count))
+            if (!AssertEquals("16:9 position", 1, positions.Count))
             {
                 return false;
             }
 
-            var ratio1Patch = ConvertToBytes(ratio);
-            Patch(ref buffer, positions.First() + PATTERN_ASPECTRATIO1_OFFSET, ratio1Patch);
+            var ratio1Patch = ConvertToBytes(doubleRatio);
+            Patch(ref buffer, positions, ratio1Patch);*/
 
+            //To review: In Nioh 1, this pattern was found once, while it is now found 4 times,
+            /*//I don't know what it represents nor if it's just a chance that it's found 4 times,
+            //but replacing any of them does not seem to make any difference on UI nor FOV.
             //Aspect Ratio Fix #2
+            positions = FindSequence(ref buffer, StringToPattern(PATTERN_ASPECTRATIO1), 0);
+
+            if (!AssertEquals(nameof(PATTERN_ASPECTRATIO1), 4, positions.Count))
+            {
+                return false;
+            }
+
+            var ratio2Patch = ConvertToBytes(ratio);
+            foreach (var position in positions)
+            {
+                Patch(ref buffer, position + PATTERN_ASPECTRATIO1_OFFSET, ratio1Patch);
+            }*/
+
+            //To review: Patching this crashes the game on startup
+            /*//Aspect Ratio Fix #3
             positions = FindSequence(ref buffer, StringToPattern(PATTERN_ASPECTRATIO2), 0);
 
             if (!AssertEquals(nameof(PATTERN_ASPECTRATIO2), 1, positions.Count))
@@ -209,10 +201,11 @@ namespace NiohResolution
                 return false;
             }
 
-            var ratio2Patch = ConvertToBytes(ratioHeight).Concat(ConvertToBytes(ratioWidth)).ToArray();
-            Patch(ref buffer, positions, ratio2Patch);
+            var ratio3Patch = ConvertToBytes(ratioHeight).Concat(ConvertToBytes(ratioWidth)).ToArray();
+            Patch(ref buffer, positions, ratio2Patch);*/
 
-            //Magic Fix #1
+            //To review: not found
+            /*//Magic Fix #1
             positions = FindSequence(ref buffer, StringToPattern(PATTERN_MAGIC1), 0);
 
             if (!AssertEquals(nameof(PATTERN_MAGIC1), 1, positions.Count))
@@ -220,9 +213,10 @@ namespace NiohResolution
                 return false;
             }
 
-            Patch(ref buffer, positions, StringToPattern(PATTERN_MAGIC1_PATCH));
+            Patch(ref buffer, positions, StringToPattern(PATTERN_MAGIC1_PATCH));*/
 
-            //Magic Fix #2 - A
+            //To review: needed?
+            /*//Magic Fix #2 - A
             positions = FindSequence(ref buffer, StringToPattern(PATTERN_MAGIC2_A), 0);
 
             if (!AssertEquals(nameof(PATTERN_MAGIC2_A), 1, positions.Count))
@@ -240,127 +234,44 @@ namespace NiohResolution
                 return false;
             }
 
-            Patch(ref buffer, positions.First(), StringToPattern(PATTERN_MAGIC2_B_PATCH));
+            Patch(ref buffer, positions.First(), StringToPattern(PATTERN_MAGIC2_B_PATCH));*/
 
             return true;
         }
 
-        private static bool PatchResolution(ref byte[] buffer, int width, int height, float scale)
+        private static bool PatchResolution(ref byte[] buffer, int width, int height)
         {
-            var positions = FindSequence(ref buffer, StringToPattern(PATTERN_RESOLUTION), 0);
+            // Experimenting with resolutions to replace.
+            // Some of them are hardcoded in the exe more than once, as maybe they represent the resolution of
+            // other textures or effects, so better leave them alone.
+            // The values we are looking to change are next to each other, and the first one
+            // is the window resolution, the second is the internal resolution.
+            var patternResolution720p = ConvertToBytes(1280).Concat(ConvertToBytes(720)).ToArray(); // Found 3 (index 0 and 1 are the good ones)
+            var patternResolution1080p = ConvertToBytes(1920).Concat(ConvertToBytes(1080)).ToArray(); // Found 4 (index 1 and 2 are the good ones)
+            var patternResolution1440p = ConvertToBytes(2560).Concat(ConvertToBytes(1440)).ToArray(); // Found 2
+            var patternResolution1440pUltrawide = ConvertToBytes(3440).Concat(ConvertToBytes(1440)).ToArray(); // Found 2
+            var patternResolution2160p = ConvertToBytes(3840).Concat(ConvertToBytes(2160)).ToArray(); // Found 2
 
-            if (!AssertEquals(nameof(PATTERN_RESOLUTION), 2, positions.Count))
+            // Replace a resolution that is already ultrawide, in case there are some more hardcoded checks (you never know...)
+            // which only calculate the FOV based on the resolution if you selected an ultrawide one.
+            // Plus, at least we already have a base 21:9 aspect ration to begin win, in case we failed to
+            // patch some aspect ratio values for the UI.
+            var positions = FindSequence(ref buffer, patternResolution1440pUltrawide, 0);
+
+            if (!AssertEquals("patternResolution", 2, positions.Count))
             {
                 return false;
             }
 
-            //Window resolution
             var resolution = ConvertToBytes(width).Concat(ConvertToBytes(height)).ToArray();
-            Patch(ref buffer, positions[0], resolution);
+            var windowResolution = resolution;
+            var internalResolution = windowResolution;
 
-            //Internal resolution
-            int internalWidth = (int)Math.Round(width * scale);
-            int internalHeight = (int)Math.Round(height * scale);
+            // Window resolution
+            Patch(ref buffer, positions[0], windowResolution);
 
-            resolution = ConvertToBytes(internalWidth).Concat(ConvertToBytes(internalHeight)).ToArray();
-            Patch(ref buffer, positions[1], resolution);
-
-            return true;
-        }
-
-        //Source: http://www.wsgf.org/forums/viewtopic.php?f=64&t=32376&start=150
-        private static bool PatchFMV(ref byte[] buffer)
-        {
-            //Magic Fix #1
-            var offset = 0x3c5b78;
-            var find = "96 40 01 66 0F 7F 41";
-            var patch = "E9 62 31 40 01 90 90";
-            var result = CompareSequence(ref buffer, StringToPattern(find), offset);
-
-            if (!AssertEquals("FMV_MAGIC1", true, result))
-            {
-                return false;
-            }
-
-            Patch(ref buffer, offset, StringToPattern(patch));
-
-            //Magic Fix #2
-            offset = 0xb5965f;
-            find = "61 00 48 8B 74 24 38 48";
-            patch = "E9 45 F7 C6 00 90 90 90";
-            result = CompareSequence(ref buffer, StringToPattern(find), offset);
-
-            if (!AssertEquals("FMV_MAGIC2", true, result))
-            {
-                return false;
-            }
-
-            Patch(ref buffer, offset, StringToPattern(patch));
-
-            //Magic Fix #3
-            offset = 0x1159f5b;
-            find = "25 48 8B 47 78 48 03";
-            patch = "E9 4F ED 66 78 90 90";
-            result = CompareSequence(ref buffer, StringToPattern(find), offset);
-
-            if (!AssertEquals("FMV_MAGIC3", true, result))
-            {
-                return false;
-            }
-
-            Patch(ref buffer, offset, StringToPattern(patch));
-
-            //Magic Fix #4
-            offset = 0x1159f7c;
-            find = "8B 01 FF 50 78 48 8B";
-            patch = "E9 41 ED 66 00 90 90";
-            result = CompareSequence(ref buffer, StringToPattern(find), offset);
-
-            if (!AssertEquals("FMV_MAGIC4", true, result))
-            {
-                return false;
-            }
-
-            Patch(ref buffer, offset, StringToPattern(patch));
-
-            //Magic Fix #5
-            offset = 0x11698e9;
-            find = "00 89 41 24 8B 87";
-            patch = "E9 16 F4 65 8B 90";
-            result = CompareSequence(ref buffer, StringToPattern(find), offset);
-
-            if (!AssertEquals("FMV_MAGIC5", true, result))
-            {
-                return false;
-            }
-
-            Patch(ref buffer, offset, StringToPattern(patch));
-
-            //Magic Fix #6
-            offset = 0x1196c12;
-            find = "20 E8 C8 CB FC FF 83 BF";
-            patch = "E9 5F 21 63 00 90 90 90";
-            result = CompareSequence(ref buffer, StringToPattern(find), offset);
-
-            if (!AssertEquals("FMV_MAGIC6", true, result))
-            {
-                return false;
-            }
-
-            Patch(ref buffer, offset, StringToPattern(patch));
-
-            //Magic Fix #7
-            offset = 0x17c8caf;
-            find = "CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC";
-            patch = "4C 03 87 88 00 00 00 C6 87 F4 23 08 F5 00 E9 A0 12 99 FF 48 8B 47 78 48 03 C0 80 7B 44 00 0F 84 B0 12 99 FF C6 87 F4 23 08 F5 01 E9 A4 12 99 FF C7 41 50 39 8E E3 3F 49 8B 81 B0 0D 00 00 F3 0F 10 80 78 13 00 00 F3 0F 59 41 50 F3 0F 11 41 50 E9 7B CE BF FE 49 8B 45 40 80 B8 74 2A 36 FF 01 74 0B 8B 87 78 01 00 00 E9 D3 0B 9A FF F3 44 0F 10 BF 78 01 00 00 F3 44 0F 59 B8 78 2A 36 FF F3 44 0F 5E B8 7C 2A 36 FF F3 44 0F 11 79 18 45 0F 57 FF DB 87 38 03 00 00 D8 88 78 2A 36 FF D8 B0 7C 2A 36 FF DB 9F 38 03 00 00 D9 87 80 03 00 00 D8 B0 78 2A 36 FF D8 88 7C 2A 36 FF D9 9F 80 03 00 00 E9 7C 0B 9A FF 4C 8B 44 24 58 4D 8B 80 6B 50 27 01 41 80 78 D4 01 74 0D F3 0F 10 9F B0 08 00 00 E9 84 DE 9C FF F3 0F 10 9F B0 08 00 00 F3 41 0F 5E 58 D8 E9 71 DE 9C FF 4C 8B 5C 24 28 4D 8B 9B 8F 7B E9 01 41 80 7B D4 01 74 0D F3 0F 11 89 CC 01 00 00 E9 9E 08 39 FF F3 41 0F 5E 4B D8 F3 41 0F 59 4B DC F3 0F 11 89 CC 01 00 00 E9 85 08 39 FF";
-            result = CompareSequence(ref buffer, StringToPattern(find), offset);
-
-            if (!AssertEquals("FMV_MAGIC7", true, result))
-            {
-                return false;
-            }
-
-            Patch(ref buffer, offset, StringToPattern(patch));
+            // Internal resolution (don't scale it by any value as it can already been scaled from the game settings, and it seems to work even after overwriting resolutions)
+            Patch(ref buffer, positions[1], internalResolution);
 
             return true;
         }
@@ -464,6 +375,18 @@ namespace NiohResolution
         }
 
         private static byte[] ConvertToBytes(float value)
+        {
+            byte[] bytes = BitConverter.GetBytes(value);
+
+            if (!BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(bytes);
+            }
+
+            return bytes;
+        }
+
+        private static byte[] ConvertToBytes(double value)
         {
             byte[] bytes = BitConverter.GetBytes(value);
 

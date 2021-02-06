@@ -1,19 +1,23 @@
-# NiohResolution
+# Nioh2Resolution
 
-NiohResolution adds support for any resolution to *Nioh: Complete Edition* on PC.
+Nioh2Resolution adds support for 21:9+ resolutions to *Nioh 2: Complete Edition* on PC.
 
 ## How to use?
 
-1) Download the latest release of NiohResolution.
-2) Save `NiohResolution.exe` to the root of the *Nioh: Complete Edition* game-directory. By default this would be `C:\Program Files\Steam\steamapps\common\Nioh`.
-3) Run `NiohResolution.exe` and follow the instructions.
-4) Start the launcher and set your resolution to 1920x1080.
-5) Start the game and enjoy!
+1) Download the latest release of Nioh2Resolution.
+2) Save `Nioh2Resolution.exe` to the root of the *Nioh 2: Complete Edition* game-directory (Defaults to `C:\Program Files\Steam\steamapps\common\Nioh2` for Steam installs)
+3) Run `Nioh2Resolution.exe` and follow the instructions.
+4) Start the game and set the resolution to 3440x1440 (if that is not shown in the game menu, set it in %USERPROFILE%\Documents\KoeiTecmo\NIOH2\config.xml)
+5) Restart the game as there seems to be a bug that breaks the brightness (and UI scaling) if you change resolution after startup.
 
 ## How does it work?
 
 Before doing anything, the game will be unpacked using [Steamless](https://github.com/atom0s/Steamless). This is required because the Steam DRM will otherwise not allow a modified executable.
 
-Once unpacked, the patcher will look for the byte representation of the 1920x1080 resolution, and change all occurances to your desired resolution.
+Once unpacked, the patcher will look for the byte representation of the 3440x1440 resolution, and change all occurances to your desired resolution.
+Note that differently from the original patch for the first game, this doesn't patch the aspect ratio of the UI yet, so it won't work great at random resolution that are less than 16:9 for example,
+but anything above 21:9 should work decently.
+Some of the UI remains anchored as if you had a 21:9 resolution, some other anchors to your custom aspect ratio correctly. Some other UI scales its size incorrectly,
+but none of them break the game or becomes invisible. Loading screens and cutscenes seem fine.
 
 In theory, this patcher should work for any version of the game.
