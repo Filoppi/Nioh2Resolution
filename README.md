@@ -2,12 +2,14 @@
 
 Nioh2Resolution adds support for 21:9+ resolutions (or any) to *Nioh 2: Complete Edition* on PC.
 
-Credit to  LennardF1989 for to original Nioh 1 version.
+Credit to LennardF1989 for the original Nioh 1 version.
+
+Donations: https://www.paypal.com/donate?hosted_button_id=BFT6XUJPRL6YC
 
 ## How to use?
 
 1) Download the latest release of Nioh2Resolution.
-2) Save `Nioh2Resolution.exe` to the root of the *Nioh 2: Complete Edition* game-directory (Defaults to `C:\Program Files\Steam\steamapps\common\Nioh2` for Steam installs)
+2) Save the content of the archive to the root of the *Nioh 2: Complete Edition* game-directory (Defaults to `C:\Program Files\Steam\steamapps\common\Nioh2` for Steam installs) (you can delete it later on)
 3) Run `Nioh2Resolution.exe` and follow the instructions.
 4) Start the game and set the resolution to 3440x1440 (if that is not shown in the game menu, set it in %USERPROFILE%\Documents\KoeiTecmo\NIOH2\config.xml)
 5) Restart the game as there seems to be a bug that breaks the brightness (and UI scaling) if you change resolution after startup.

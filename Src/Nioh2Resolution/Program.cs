@@ -16,6 +16,9 @@ namespace Nioh2Resolution
         private const string EXE_FILE_BACKUP = "nioh2.exe.backup.exe";
         private const string EXE_FILE_UNPACKED = "nioh2.exe.unpacked.exe";
 
+        private const int RES_TO_REPLACE_W = 3440;
+        private const int RES_TO_REPLACE_H = 1440;
+
         public static void Main(string[] args)
         {
             Thread.CurrentThread.CurrentCulture = new CultureInfo("en-US");
@@ -24,8 +27,8 @@ namespace Nioh2Resolution
 
             Console.WriteLine("\nPlease enter your desired resolution.\n");
 
-            int width = ReadInt("Width", 3440);
-            int height = ReadInt("Height", 1440);
+            int width = ReadInt("Width", RES_TO_REPLACE_W);
+            int height = ReadInt("Height", RES_TO_REPLACE_H);
 
             if (File.Exists(EXE_FILE_BACKUP))
             {
@@ -81,7 +84,7 @@ namespace Nioh2Resolution
             File.WriteAllBytes(EXE_FILE, buffer);
             File.Delete(EXE_FILE_UNPACKED);
 
-            Console.WriteLine("\nDone! Don't forget to set the game resolution to 3440x1440 (you can also do it from the config).");
+            Console.WriteLine($"\nDone! Don't forget to set the game resolution to {RES_TO_REPLACE_W}x{RES_TO_REPLACE_H} (you can also do it from the config).");
 
             Exit();
         }
@@ -125,49 +128,51 @@ namespace Nioh2Resolution
             return PatchAspectRatio(ref buffer, width, height) && PatchResolution(ref buffer, width, height);
         }
 
-        // Patching of Aspect Ratio has been disabled as it does not seem strictly necessary.
-        // UI scales decently (not perfectly as some things end up scaled uncorrectly or anchored to wrong places,
-        // but overall it's decent, so for now just keep this off, until someone can bother to actually find the hex values.
+        // UI scales decently (not perfectly as some things end up scaled uncorrectly or anchored to wrong places),
+        // but overall it's decent. Hopefully someone will find the hex values responsible for anchoring/scaling based on res,
+        // or make sense of the values here.
+        // When at aspect ratios less wide than than 16:9 (e.g. 16:10, 4:3), we scale the UI otherwise it would be anchored
+        // around 16:9 and be partially hidden. It should not cause stretching (though some menus could look wronger, in game UI will be better).
+        // It's possible to stretch the UI at aspect ratios wider than 21:9 but I didn't feel like it was needed, as it would mostly look worse.
         //Source: http://www.wsgf.org/forums/viewtopic.php?f=64&t=32376&start=110
         private static bool PatchAspectRatio(ref byte[] buffer, int width, int height)
         {
-            // These values are from Nioh 1
-            const string PATTERN_ASPECTRATIO1 = "C7 43 50 39 8E E3 3F";
-            const int PATTERN_ASPECTRATIO1_OFFSET = 3;
-
-            const string PATTERN_ASPECTRATIO2 = "00 00 87 44 00 00 F0 44";
-
-            const string PATTERN_MAGIC1 = "0F 95 C0 88 46 34";
-            const string PATTERN_MAGIC1_PATCH = "32 C0 90 88 46 34";
-
-            const string PATTERN_MAGIC2_A = "45 85 D2 7E 1A";
-            const string PATTERN_MAGIC2_A_PATCH = "45 85 D2 EB 1A";
-
-            const string PATTERN_MAGIC2_B = "C3 79 14";
-            const string PATTERN_MAGIC2_B_PATCH = "C3 EB 14";
-
+            //To review: instead of RES_TO_REPLACE_W, this should probably be: MAX_ASPECT_RATIO_RES
+            //float scale = (width / (float)height) / (RES_TO_REPLACE_W / (float)RES_TO_REPLACE_H);
+            //width = (int)(width / scale); //To round
             float ratio = width / (float)height;
             double doubleRatio = width / (double)height;
-            double ratio_16_9 = 1920.0 / 1080.0;
-            float ratioWidth = 1920;
-            float ratioHeight = 1080;
 
-            if (ratio < 1.77777)
+            int default_w = 1920; // 16
+            int default_h = 1080; // 9
+            float ratio_default = (float)default_w / (float)default_h;
+            double double_ratio_default = (double)default_w / (double)default_h;
+            float ratioWidth = default_w;
+            float ratioHeight = default_h;
+
+            bool scale_UI = false;
+
+            if (ratio < (default_w / (float)default_h))
             {
                 ratioHeight = ratioWidth / ratio;
+                scale_UI = true;
             }
             else
             {
                 ratioWidth = ratioHeight * ratio;
             }
 
-            //To review: There seems to be a double hardcoded as 16:9 in the code, but
-            /*//changing it seems to have no effect. Better leave it alone.
-            //While for float 16:9, there are like 40 hardcoded instances.
-            //Aspect Ratio Fix #1
-            var positions = FindSequence(ref buffer, ConvertToBytes(ratio_16_9), 0);
+            if (!scale_UI)
+            {
+                return true;
+            }
 
-            if (!AssertEquals("16:9 position", 1, positions.Count))
+            var positions = new List<int>();
+
+            /*//Aspect Ratio Fix #1 (double 16/9): Disabled as it seems to have no effect on UI
+            positions = FindSequence(ref buffer, ConvertToBytes(double_ratio_default), 0);
+
+            if (!AssertEquals("Aspect Ratio Pattern 1", 1, positions.Count))
             {
                 return false;
             }
@@ -175,66 +180,38 @@ namespace Nioh2Resolution
             var ratio1Patch = ConvertToBytes(doubleRatio);
             Patch(ref buffer, positions, ratio1Patch);*/
 
-            //To review: In Nioh 1, this pattern was found once, while it is now found 4 times,
-            /*//I don't know what it represents nor if it's just a chance that it's found 4 times,
-            //but replacing any of them does not seem to make any difference on UI nor FOV.
-            //Aspect Ratio Fix #2
-            positions = FindSequence(ref buffer, StringToPattern(PATTERN_ASPECTRATIO1), 0);
+            //Aspect Ratio Fix #2 (float 16/9): Changes the UI aspect ratio/scale
+            positions = FindSequence(ref buffer, ConvertToBytes(ratio_default), 0);
 
-            if (!AssertEquals(nameof(PATTERN_ASPECTRATIO1), 4, positions.Count))
+            if (!AssertEquals("Aspect Ratio Pattern 2", 26, positions.Count))
             {
                 return false;
             }
 
             var ratio2Patch = ConvertToBytes(ratio);
-            foreach (var position in positions)
+            int i = 0;
+            // Indexs 0 to 20 and 22 to 25 have no effects on UI.
+            // Only index 21 has an effect, at least in the first released Steam version, so this patch might not be safe after game updates.
+            int i_min = 21;
+            int i_max = 21;
+            foreach (int position in positions)
             {
-                Patch(ref buffer, position + PATTERN_ASPECTRATIO1_OFFSET, ratio1Patch);
-            }*/
+                if (i >= i_min && i <= i_max)
+                    Patch(ref buffer, position, ratio2Patch);
+                ++i;
+            }
 
-            //To review: Patching this crashes the game on startup
-            /*//Aspect Ratio Fix #3
-            positions = FindSequence(ref buffer, StringToPattern(PATTERN_ASPECTRATIO2), 0);
+            //Aspect Ratio Fix #3: Scales the UI in a way that I could not understand. The smaller the numbers are, the bigger the UI gets.
+            /*var ratio3Pattern = ConvertToBytes((float)default_h).Concat(ConvertToBytes((float)default_w)).ToArray();
+            positions = FindSequence(ref buffer, ratio3Pattern, 0);
 
-            if (!AssertEquals(nameof(PATTERN_ASPECTRATIO2), 1, positions.Count))
+            if (!AssertEquals("Aspect Ratio Pattern 3", 1, positions.Count))
             {
                 return false;
             }
 
             var ratio3Patch = ConvertToBytes(ratioHeight).Concat(ConvertToBytes(ratioWidth)).ToArray();
-            Patch(ref buffer, positions, ratio2Patch);*/
-
-            //To review: not found
-            /*//Magic Fix #1
-            positions = FindSequence(ref buffer, StringToPattern(PATTERN_MAGIC1), 0);
-
-            if (!AssertEquals(nameof(PATTERN_MAGIC1), 1, positions.Count))
-            {
-                return false;
-            }
-
-            Patch(ref buffer, positions, StringToPattern(PATTERN_MAGIC1_PATCH));*/
-
-            //To review: needed?
-            /*//Magic Fix #2 - A
-            positions = FindSequence(ref buffer, StringToPattern(PATTERN_MAGIC2_A), 0);
-
-            if (!AssertEquals(nameof(PATTERN_MAGIC2_A), 1, positions.Count))
-            {
-                return false;
-            }
-
-            Patch(ref buffer, positions, StringToPattern(PATTERN_MAGIC2_A_PATCH));
-
-            //Magic Fix #2 - B
-            positions = FindSequence(ref buffer, StringToPattern(PATTERN_MAGIC2_B), positions.First());
-
-            if (!AssertEquals(nameof(PATTERN_MAGIC2_B), 1, positions.Count))
-            {
-                return false;
-            }
-
-            Patch(ref buffer, positions.First(), StringToPattern(PATTERN_MAGIC2_B_PATCH));*/
+            Patch(ref buffer, positions, ratio3Patch);*/
 
             return true;
         }
@@ -252,11 +229,13 @@ namespace Nioh2Resolution
             var patternResolution1440pUltrawide = ConvertToBytes(3440).Concat(ConvertToBytes(1440)).ToArray(); // Found 2
             var patternResolution2160p = ConvertToBytes(3840).Concat(ConvertToBytes(2160)).ToArray(); // Found 2
 
+            var patternResolution = ConvertToBytes(RES_TO_REPLACE_W).Concat(ConvertToBytes(RES_TO_REPLACE_H)).ToArray();
+
             // Replace a resolution that is already ultrawide, in case there are some more hardcoded checks (you never know...)
             // which only calculate the FOV based on the resolution if you selected an ultrawide one.
-            // Plus, at least we already have a base 21:9 aspect ration to begin win, in case we failed to
+            // Plus, at least we already have a base 21:9 aspect ratio to begin win, in case we failed to
             // patch some aspect ratio values for the UI.
-            var positions = FindSequence(ref buffer, patternResolution1440pUltrawide, 0);
+            var positions = FindSequence(ref buffer, patternResolution, 0);
 
             if (!AssertEquals("patternResolution", 2, positions.Count))
             {

@@ -9,7 +9,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("Nioh2Resolution")]
-[assembly: AssemblyCopyright("Copyright © Lennard Fonteijn 2021")]
+[assembly: AssemblyCopyright("Copyright © Filippo Tarpini 2021")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
