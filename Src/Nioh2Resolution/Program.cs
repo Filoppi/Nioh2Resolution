@@ -16,19 +16,77 @@ namespace Nioh2Resolution
         private const string EXE_FILE_BACKUP = "nioh2.exe.backup.exe";
         private const string EXE_FILE_UNPACKED = "nioh2.exe.unpacked.exe";
 
-        private const int RES_TO_REPLACE_W = 3440;
-        private const int RES_TO_REPLACE_H = 1440;
+        // 16:9
+        private const int DEFAULT_AR_RES_W = 1920;
+        private const int DEFAULT_AR_RES_H = 1080;
+        private const float DEFAULT_AR = DEFAULT_AR_RES_W / (float)DEFAULT_AR_RES_H;
+
+        // Max supported is probably 43:16 (2.3888...). Though it might be 2.4, I'm not sure.
+        private const int MAX_AR_RES_1_W = 2560;
+        private const int MAX_AR_RES_1_H = 1080;
+        private const float MAX_AR_1 = MAX_AR_RES_1_W / (float)MAX_AR_RES_1_H;
+        private const int MAX_AR_RES_2_W = 3440;
+        private const int MAX_AR_RES_2_H = 1440;
+        private const float MAX_AR_2 = MAX_AR_RES_2_W / (float)MAX_AR_RES_2_H;
+
+        private static int RES_TO_REPLACE_W = 3440;
+        private static int RES_TO_REPLACE_H = 1440;
 
         public static void Main(string[] args)
         {
             Thread.CurrentThread.CurrentCulture = new CultureInfo("en-US");
 
-            Console.WriteLine("Welcome to the Nioh 2 Resolution patcher!");
+            Console.WriteLine("Welcome to the Nioh 2 Resolution patcher!\n");
+
+            int res_to_replace = ReadInt("Select the resolution you want to replace.\n1 for 1280x720, 2 for 1920x1080, 3 for 3440x1440 (suggested for Ultrawide).", 1);
+            if (res_to_replace <= 1 || res_to_replace > 3)
+            {
+                RES_TO_REPLACE_W = 1280;
+                RES_TO_REPLACE_H = 720;
+            }
+            else if (res_to_replace == 2)
+            {
+                RES_TO_REPLACE_W = 1920;
+                RES_TO_REPLACE_H = 1080;
+            }
+            else if (res_to_replace == 3)
+            {
+                RES_TO_REPLACE_W = 3440;
+                RES_TO_REPLACE_H = 1440;
+            }
 
             Console.WriteLine("\nPlease enter your desired resolution.\n");
 
             int width = ReadInt("Width", RES_TO_REPLACE_W);
             int height = ReadInt("Height", RES_TO_REPLACE_H);
+
+            bool patch_UI = false;
+            float ratio = width / (float)height;
+            float tolerance = 0.0001f;
+            if (ratio + tolerance < DEFAULT_AR)
+            {
+                Console.WriteLine("");
+                if (ReadBool("Your desired aspect ratio is below the minimum official supported (parts of the UI might not be visible).\nWould you like to apply an EXPERIMENTAL fix to scale down the UI?", false))
+                {
+                    patch_UI = true;
+                }
+                else
+                {
+                    Console.WriteLine("");
+                    if (ReadBool("Would you like this app to find the maximum 16:9 resolution contained by your screen?\nThat way you could play borderless with black bars by putting a black background behind the game", false))
+                    {
+                        height = (int)Math.Round(width / DEFAULT_AR);
+                    }
+                }
+            }
+            else if (ratio - tolerance > DEFAULT_AR && ratio + tolerance < MAX_AR_1)
+            {
+                Console.WriteLine("\nYour aspect ratio is in between supported ones (16:9 and 21:9). UI might no scale or anchor correctly.");
+            }
+            else if (ratio - tolerance > MAX_AR_2)
+            {
+                Console.WriteLine("\nYour aspect ratio is above 43:16 (21:9), the officially supported max.\nUI will work but it won't scale or anchor perfectly.");
+            }
 
             if (File.Exists(EXE_FILE_BACKUP))
             {
@@ -54,7 +112,7 @@ namespace Nioh2Resolution
             var result = UnpackExe();
             if (!result)
             {
-                Console.WriteLine($"\nUnpacking of {EXE_FILE} failed, this could mean the file is already unpacked and ready for patching.");
+                Console.WriteLine($"\nUnpacking of {EXE_FILE} failed (will continue).");
 
                 File.Copy(EXE_FILE, EXE_FILE_UNPACKED, true);
             }
@@ -63,7 +121,9 @@ namespace Nioh2Resolution
 
             var buffer = File.ReadAllBytes(EXE_FILE_UNPACKED);
 
-            result = PatchExe(ref buffer, width, height);
+            bool UI_patch_failed = false;
+            result = PatchExe(ref buffer, width, height, patch_UI, ref UI_patch_failed);
+
             if (!result)
             {
                 Console.WriteLine("\nPatching failed, consider restoring a backup and try again.");
@@ -73,6 +133,10 @@ namespace Nioh2Resolution
                 Exit();
 
                 return;
+            }
+            else if (UI_patch_failed)
+            {
+                Console.WriteLine("\nUI failed to patch, resolution was patched nonetheless.");
             }
 
             Console.WriteLine($"\nBacking up {EXE_FILE}...");
@@ -84,7 +148,7 @@ namespace Nioh2Resolution
             File.WriteAllBytes(EXE_FILE, buffer);
             File.Delete(EXE_FILE_UNPACKED);
 
-            Console.WriteLine($"\nDone! Don't forget to set the game resolution to {RES_TO_REPLACE_W}x{RES_TO_REPLACE_H} (you can also do it from the config).");
+            Console.WriteLine($"\nDone! Don't forget to set the game resolution to {RES_TO_REPLACE_W}x{RES_TO_REPLACE_H} and restart the game.\nYou can also do it from the config file.");
 
             Exit();
         }
@@ -115,7 +179,7 @@ namespace Nioh2Resolution
 
             if (!result)
             {
-                Console.WriteLine($"-> Processing {EXE_FILE} failed!");
+                Console.WriteLine($"-> Processing {EXE_FILE} failed (file might not be encrypted)!");
 
                 return false;
             }
@@ -123,9 +187,10 @@ namespace Nioh2Resolution
             return true;
         }
 
-        private static bool PatchExe(ref byte[] buffer, int width, int height)
+        private static bool PatchExe(ref byte[] buffer, int width, int height, bool patch_UI, ref bool UI_patch_failed)
         {
-            return PatchAspectRatio(ref buffer, width, height) && PatchResolution(ref buffer, width, height);
+            UI_patch_failed = !PatchAspectRatio(ref buffer, width, height, patch_UI);
+            return PatchResolution(ref buffer, width, height);
         }
 
         // UI scales decently (not perfectly as some things end up scaled uncorrectly or anchored to wrong places),
@@ -135,24 +200,20 @@ namespace Nioh2Resolution
         // around 16:9 and be partially hidden. It should not cause stretching (though some menus could look wronger, in game UI will be better).
         // It's possible to stretch the UI at aspect ratios wider than 21:9 but I didn't feel like it was needed, as it would mostly look worse.
         //Source: http://www.wsgf.org/forums/viewtopic.php?f=64&t=32376&start=110
-        private static bool PatchAspectRatio(ref byte[] buffer, int width, int height)
+        private static bool PatchAspectRatio(ref byte[] buffer, int width, int height, bool patch_UI)
         {
-            //To review: instead of RES_TO_REPLACE_W, this should probably be: MAX_ASPECT_RATIO_RES
-            //float scale = (width / (float)height) / (RES_TO_REPLACE_W / (float)RES_TO_REPLACE_H);
-            //width = (int)(width / scale); //To round
+            //float scale = (width / (float)height) / MAX_AR_2;
+            //width = (int)Math.Round(width / scale);
             float ratio = width / (float)height;
             double doubleRatio = width / (double)height;
 
-            int default_w = 1920; // 16
-            int default_h = 1080; // 9
-            float ratio_default = (float)default_w / (float)default_h;
-            double double_ratio_default = (double)default_w / (double)default_h;
-            float ratioWidth = default_w;
-            float ratioHeight = default_h;
+            double double_ratio_default = (double)DEFAULT_AR_RES_W / (double)DEFAULT_AR_RES_H;
+            float ratioWidth = DEFAULT_AR_RES_W;
+            float ratioHeight = DEFAULT_AR_RES_H;
 
             bool scale_UI = false;
 
-            if (ratio < (default_w / (float)default_h))
+            if (ratio < DEFAULT_AR)
             {
                 ratioHeight = ratioWidth / ratio;
                 scale_UI = true;
@@ -162,7 +223,7 @@ namespace Nioh2Resolution
                 ratioWidth = ratioHeight * ratio;
             }
 
-            if (!scale_UI)
+            if (!scale_UI || !patch_UI)
             {
                 return true;
             }
@@ -181,7 +242,7 @@ namespace Nioh2Resolution
             Patch(ref buffer, positions, ratio1Patch);*/
 
             //Aspect Ratio Fix #2 (float 16/9): Changes the UI aspect ratio/scale
-            positions = FindSequence(ref buffer, ConvertToBytes(ratio_default), 0);
+            positions = FindSequence(ref buffer, ConvertToBytes(DEFAULT_AR), 0);
 
             if (!AssertEquals("Aspect Ratio Pattern 2", 26, positions.Count))
             {
@@ -202,7 +263,7 @@ namespace Nioh2Resolution
             }
 
             //Aspect Ratio Fix #3: Scales the UI in a way that I could not understand. The smaller the numbers are, the bigger the UI gets.
-            /*var ratio3Pattern = ConvertToBytes((float)default_h).Concat(ConvertToBytes((float)default_w)).ToArray();
+            /*var ratio3Pattern = ConvertToBytes((float)DEFAULT_AR_RES_H).Concat(ConvertToBytes((float)DEFAULT_AR_RES_W)).ToArray();
             positions = FindSequence(ref buffer, ratio3Pattern, 0);
 
             if (!AssertEquals("Aspect Ratio Pattern 3", 1, positions.Count))
@@ -225,6 +286,7 @@ namespace Nioh2Resolution
             // is the window resolution, the second is the internal resolution.
             var patternResolution720p = ConvertToBytes(1280).Concat(ConvertToBytes(720)).ToArray(); // Found 3 (index 0 and 1 are the good ones)
             var patternResolution1080p = ConvertToBytes(1920).Concat(ConvertToBytes(1080)).ToArray(); // Found 4 (index 1 and 2 are the good ones)
+            var patternResolution1080pUltrawide = ConvertToBytes(1280).Concat(ConvertToBytes(720)).ToArray(); // Found 2
             var patternResolution1440p = ConvertToBytes(2560).Concat(ConvertToBytes(1440)).ToArray(); // Found 2
             var patternResolution1440pUltrawide = ConvertToBytes(3440).Concat(ConvertToBytes(1440)).ToArray(); // Found 2
             var patternResolution2160p = ConvertToBytes(3840).Concat(ConvertToBytes(2160)).ToArray(); // Found 2
@@ -237,7 +299,27 @@ namespace Nioh2Resolution
             // patch some aspect ratio values for the UI.
             var positions = FindSequence(ref buffer, patternResolution, 0);
 
-            if (!AssertEquals("patternResolution", 2, positions.Count))
+            bool replacing_1280x720 = RES_TO_REPLACE_W == 1280 && RES_TO_REPLACE_H == 720;
+            bool replacing_1920x1080 = RES_TO_REPLACE_W == 1920 && RES_TO_REPLACE_H == 1080;
+
+            int i1 = 0;
+            int i2 = 1;
+            int expected_results = 2;
+
+            if (replacing_1280x720)
+            {
+                i1 = 0;
+                i2 = 1;
+                expected_results = 3;
+            }
+            else if (replacing_1920x1080)
+            {
+                i1 = 1;
+                i2 = 2;
+                expected_results = 4;
+            }
+
+            if (!AssertEquals("patternResolution", expected_results, positions.Count))
             {
                 return false;
             }
@@ -247,10 +329,25 @@ namespace Nioh2Resolution
             var internalResolution = windowResolution;
 
             // Window resolution
-            Patch(ref buffer, positions[0], windowResolution);
+            Patch(ref buffer, positions[i1], windowResolution);
 
             // Internal resolution (don't scale it by any value as it can already been scaled from the game settings, and it seems to work even after overwriting resolutions)
-            Patch(ref buffer, positions[1], internalResolution);
+            Patch(ref buffer, positions[i2], internalResolution);
+
+            /*// Patch resolution text (doesn't work, text is likely is an asset)
+            string resolutionText = $"{RES_TO_REPLACE_W} x {RES_TO_REPLACE_H}";
+            string customResolutionText = $"{width} x {height}";
+            bool ultrawide = (RES_TO_REPLACE_W / (float)RES_TO_REPLACE_H) > 1.78; // 16/9 with tolerance
+            if (ultrawide)
+            {
+                resolutionText += " (Ultrawide)";
+                customResolutionText += " (Patch res)"; // Needs to be of the same length of course
+            }
+            var patternResolutionText = ConvertToBytes(resolutionText);
+            var patchResolutionText = ConvertToBytes(customResolutionText);
+            positions = FindSequence(ref buffer, patternResolutionText, 0);
+
+            Patch(ref buffer, positions, patchResolutionText);*/
 
             return true;
         }
@@ -374,6 +471,13 @@ namespace Nioh2Resolution
                 Array.Reverse(bytes);
             }
 
+            return bytes;
+        }
+
+        private static byte[] ConvertToBytes(string value)
+        {
+            // Unicode specifically for Nioh 2 (not UTF8 nor ASCII)
+            byte[] bytes = System.Text.Encoding.Unicode.GetBytes(value);
             return bytes;
         }
 
