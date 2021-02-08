@@ -1,6 +1,6 @@
 # Nioh2Resolution
 
-Nioh2Resolution adds support for 21:9+ resolutions (or any) to *Nioh 2: Complete Edition* on PC.
+Nioh2Resolution Adds support for any resolutions to *Nioh 2: Complete Edition* on PC (mainly useful for 21:9+ or 16:9-).
 
 Credit to LennardF1989 for the original Nioh 1 version.
 
@@ -19,7 +19,9 @@ Donations: https://www.paypal.com/donate?hosted_button_id=BFT6XUJPRL6YC
 Before doing anything, the game will be unpacked using [Steamless](https://github.com/atom0s/Steamless). This is required because the Steam DRM will otherwise not allow a modified executable.
 
 Once unpacked, the patcher will look for the byte representation of the 3440x1440 resolution, and change all occurances to your desired resolution.
-Note that differently from the original patch for the first game, this doesn't patch the aspect ratio of the UI yet, so it won't work great at random resolution that are less than 16:9 for example, but anything above 16:9 should work decently, especially because the FOV scaling is Horizontal+.
-When above 21:9 or below 16:9, some of the UI remains anchored as if you had one of these 2 aspect ratios (the closest one), some other anchors to your custom aspect ratio correctly. Some other UI scales its size incorrectly, but none of them break the game or become invisible. Loading screens and cutscenes seem fine.
+
+Note that differently from the original patch for the first game, UI scaling isn't perfect yet.
+Anything wider than 21:9 should work decently, especially because the FOV scaling is Horizontal+, but some UI anchoring will be wrong and some other won't be scaled correctly. Loading screens and cutscenes seem fine.
+EXPRERIMENTAL: When less wide than 16:9 (e.g. 16:10, 4:3) this patch scales the UI as it remains anchored around 16:9 and some elements would not be visible. Scaling it should not cause any stretching. Note that some menus might look worse, but in game UI will be better.
 
 In theory, this patcher should work for any version of the game.
