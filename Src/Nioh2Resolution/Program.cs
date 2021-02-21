@@ -20,17 +20,30 @@ namespace Nioh2Resolution
         private const int DEFAULT_AR_RES_W = 1920;
         private const int DEFAULT_AR_RES_H = 1080;
         private const float DEFAULT_AR = DEFAULT_AR_RES_W / (float)DEFAULT_AR_RES_H;
+        private const double DEFAULT_AR_DOUBLE = DEFAULT_AR_RES_W / (double)DEFAULT_AR_RES_H;
 
-        // Max supported is probably 43:16 (2.3888...). Though it might be 2.4, I'm not sure.
+        // "Lower" max supported AR is 64:27 (2.370370...).
+        // This is the AR they have hardcoded for Widescreen as far as patch 1.26.
+        // UI will slowly drift for any other AR that isn't this or 16:9.
         private const int MAX_AR_RES_1_W = 2560;
         private const int MAX_AR_RES_1_H = 1080;
         private const float MAX_AR_1 = MAX_AR_RES_1_W / (float)MAX_AR_RES_1_H;
+        private const double MAX_AR_1_DOUBLE = MAX_AR_RES_1_W / (double)MAX_AR_RES_1_H;
+        // Max supported AR is 43:18 (2.3888...)
         private const int MAX_AR_RES_2_W = 3440;
         private const int MAX_AR_RES_2_H = 1440;
         private const float MAX_AR_2 = MAX_AR_RES_2_W / (float)MAX_AR_RES_2_H;
+        private const double MAX_AR_2_DOUBLE = MAX_AR_RES_2_W / (double)MAX_AR_RES_2_H;
+        // Guessed generic 21:9 AR
+        private const int MAX_AR_GUESS_W = 21;
+        private const int MAX_AR_GUESS_H = 9;
+        private const float MAX_AR_GUESS = MAX_AR_GUESS_W / (float)MAX_AR_GUESS_H;
+        private const double MAX_AR_GUESS_DOUBLE = MAX_AR_GUESS_W / (double)MAX_AR_GUESS_H;
 
-        private static int RES_TO_REPLACE_W = 3440;
-        private static int RES_TO_REPLACE_H = 1440;
+        private const float AR_TOLERANCE = 0.0001f;
+
+        private static int RES_TO_REPLACE_W = 1280;
+        private static int RES_TO_REPLACE_H = 720;
 
         public static void Main(string[] args)
         {
@@ -38,7 +51,7 @@ namespace Nioh2Resolution
 
             Console.WriteLine("Welcome to the Nioh 2 Resolution patcher!\n");
 
-            int res_to_replace = ReadInt("Select the resolution you want to replace.\n1 for 1280x720, 2 for 1920x1080, 3 for 3440x1440 (suggested for Ultrawide).", 1);
+            int res_to_replace = ReadInt("Select the resolution you want to replace.\n1 for 1280x720, 2 for 1920x1080, 3 for 3440x1440.", 1);
             if (res_to_replace <= 1 || res_to_replace > 3)
             {
                 RES_TO_REPLACE_W = 1280;
@@ -55,42 +68,54 @@ namespace Nioh2Resolution
                 RES_TO_REPLACE_H = 1440;
             }
 
-            Console.WriteLine("\nPlease enter your desired resolution.\n");
+            Console.WriteLine("\nPlease enter your desired resolution (it might not work if it's higher than your screen).");
 
             int width = ReadInt("Width", RES_TO_REPLACE_W);
             int height = ReadInt("Height", RES_TO_REPLACE_H);
 
             bool patch_UI = false;
+            bool ask_for_UI_patch = false;
+            bool ask_for_black_bars = false;
             float ratio = width / (float)height;
-            float tolerance = 0.0001f;
-            if (ratio + tolerance < DEFAULT_AR)
+            if (ratio + AR_TOLERANCE < DEFAULT_AR)
             {
-                Console.WriteLine("");
-                if (ReadBool("Your desired aspect ratio is below the minimum official supported (parts of the UI might not be visible).\nWould you like to apply an EXPERIMENTAL fix to scale down the UI?", false))
+                Console.WriteLine("\nYour aspect ratio is below the minimum official supported.");
+                ask_for_UI_patch = true;
+                ask_for_black_bars = true;
+            }
+            else if (ratio - AR_TOLERANCE > DEFAULT_AR && ratio + AR_TOLERANCE < MAX_AR_1)
+            {
+                Console.WriteLine("\nYour aspect ratio is in between supported ones (16:9 and 21:9).");
+                ask_for_UI_patch = true;
+            }
+            else if (ratio - AR_TOLERANCE > MAX_AR_1)
+            {
+                Console.WriteLine("\nYour aspect ratio is above 64:27 (~21:9), the officially supported max.");
+                ask_for_UI_patch = true;
+            }
+
+            if (ask_for_UI_patch || ask_for_black_bars)
+            {
+                Console.WriteLine("The UI might not scale or anchor correctly, it might be partially hidden and also drift as you play.");
+                /* This has been disabled for now because while it fixes the UI drifting above 21:9 and also makes the whole UI visible at 16:9, it makes some UI elements unselectable both with a mouse or with a controller, effectively not allowing you to proceed.
+                if (ask_for_UI_patch &&
+                    ReadBool("The UI might not scale or anchor correctly, it might be partially hidden and also drift as you play.\nThere is an EXPERIMANTAL fix available, it might shrink the UI in some places but it will fix the drifting and\nimprove the in game UI.\nWould you like to apply it?", false))
                 {
                     patch_UI = true;
                 }
-                else
+                else if (ask_for_black_bars)
                 {
                     Console.WriteLine("");
-                    if (ReadBool("Would you like this app to find the maximum 16:9 resolution contained by your screen?\nThat way you could play borderless with black bars by putting a black background behind the game", false))
+                    if (ReadBool("Would you like me to find the maximum 16:9 resolution contained by your screen?\nThat way you could play borderless with black bars by putting a black background behind the game", false))
                     {
                         height = (int)Math.Round(width / DEFAULT_AR);
                     }
-                }
-            }
-            else if (ratio - tolerance > DEFAULT_AR && ratio + tolerance < MAX_AR_1)
-            {
-                Console.WriteLine("\nYour aspect ratio is in between supported ones (16:9 and 21:9). UI might no scale or anchor correctly.");
-            }
-            else if (ratio - tolerance > MAX_AR_2)
-            {
-                Console.WriteLine("\nYour aspect ratio is above 43:16 (21:9), the officially supported max.\nUI will work but it won't scale or anchor perfectly.");
+                }*/
             }
 
             if (File.Exists(EXE_FILE_BACKUP))
             {
-                Console.WriteLine($"\nA backup of {EXE_FILE} has been found, it was created the last time this patcher ran succesfully.\n");
+                Console.WriteLine($"\nA backup of {EXE_FILE} has been found, it was created the last time this patcher ran succesfully.");
 
                 if (ReadBool("Do you want to restore this backup before patching?", false))
                 {
@@ -190,89 +215,213 @@ namespace Nioh2Resolution
         private static bool PatchExe(ref byte[] buffer, int width, int height, bool patch_UI, ref bool UI_patch_failed)
         {
             UI_patch_failed = !PatchAspectRatio(ref buffer, width, height, patch_UI);
-            return PatchResolution(ref buffer, width, height);
+            bool success = PatchResolution(ref buffer, width, height);
+            return success;
         }
 
-        // UI scales decently (not perfectly as some things end up scaled uncorrectly or anchored to wrong places),
-        // but overall it's decent. Hopefully someone will find the hex values responsible for anchoring/scaling based on res,
-        // or make sense of the values here.
-        // When at aspect ratios less wide than than 16:9 (e.g. 16:10, 4:3), we scale the UI otherwise it would be anchored
-        // around 16:9 and be partially hidden. It should not cause stretching (though some menus could look wronger, in game UI will be better).
-        // It's possible to stretch the UI at aspect ratios wider than 21:9 but I didn't feel like it was needed, as it would mostly look worse.
-        //Source: http://www.wsgf.org/forums/viewtopic.php?f=64&t=32376&start=110
         private static bool PatchAspectRatio(ref byte[] buffer, int width, int height, bool patch_UI)
         {
-            //float scale = (width / (float)height) / MAX_AR_2;
-            //width = (int)Math.Round(width / scale);
-            float ratio = width / (float)height;
-            double doubleRatio = width / (double)height;
+            if (!patch_UI)
+            {
+                return false;
+            }
 
-            double double_ratio_default = (double)DEFAULT_AR_RES_W / (double)DEFAULT_AR_RES_H;
+            float ratio = width / (float)height;
+            float patch_ratio = DEFAULT_AR;
+
             float ratioWidth = DEFAULT_AR_RES_W;
             float ratioHeight = DEFAULT_AR_RES_H;
-
-            bool scale_UI = false;
+            // Scaling MAX_AR_2 will make the UI slightly drift with mission restarts/cutscenes and so on...
+            float target_max_AR = MAX_AR_1;
 
             if (ratio < DEFAULT_AR)
             {
+                // Changing patch_ratio and ratioWidth didn't lead me anywhere better
                 ratioHeight = ratioWidth / ratio;
-                scale_UI = true;
             }
             else
             {
-                ratioWidth = ratioHeight * ratio;
+                // Nioh 2 compares MAX_AR_1 to DEFAULT_AR to compute how much to shift the UI of.
+                // This calculation breaks at any other aspect ratio (including the supported MAX_AR_2)
+                // and makes the UI shift/drift with time. If we patch some hardcoded values,
+                // we can fix the UI drifting at the cost of "more broken" menus and stretched AR
+                // in some cutscenes.
+                ratioWidth *= target_max_AR / DEFAULT_AR;
+                patch_ratio = target_max_AR;
             }
 
-            if (!scale_UI || !patch_UI)
-            {
-                return true;
-            }
+            /* Some random patches that didn't seem to make any difference
+            var positions = FindSequence(ref buffer, ConvertToBytes(MAX_AR_1_DOUBLE)); // 0
+            positions = FindSequence(ref buffer, ConvertToBytes(MAX_AR_2_DOUBLE)); // 0
+            positions = FindSequence(ref buffer, ConvertToBytes(MAX_AR_GUESS_DOUBLE)); // 0
+            positions = FindSequence(ref buffer, ConvertToBytes(MAX_AR_1)); // 0
+            positions = FindSequence(ref buffer, ConvertToBytes(MAX_AR_2)); // 0
+            positions = FindSequence(ref buffer, ConvertToBytes(MAX_AR_GUESS)); // 0
 
-            var positions = new List<int>();
+            positions = FindSequence(ref buffer, ConvertToBytes(DEFAULT_AR_DOUBLE / MAX_AR_1_DOUBLE)); // 2
+            Patch(ref buffer, positions, ConvertToBytes(DEFAULT_AR_DOUBLE / ratio_double));
+            positions = FindSequence(ref buffer, ConvertToBytes(DEFAULT_AR_DOUBLE / MAX_AR_2_DOUBLE)); // 0
+            Patch(ref buffer, positions, ConvertToBytes(DEFAULT_AR_DOUBLE / ratio_double));
+            positions = FindSequence(ref buffer, ConvertToBytes(DEFAULT_AR_DOUBLE / MAX_AR_GUESS_DOUBLE)); // 0
+            Patch(ref buffer, positions, ConvertToBytes(DEFAULT_AR_DOUBLE / ratio_double));
+            positions = FindSequence(ref buffer, ConvertToBytes(MAX_AR_1_DOUBLE / DEFAULT_AR_DOUBLE)); // 1
+            Patch(ref buffer, positions, ConvertToBytes(ratio_double / DEFAULT_AR_DOUBLE));
+            positions = FindSequence(ref buffer, ConvertToBytes(MAX_AR_2_DOUBLE / DEFAULT_AR_DOUBLE)); // 2
+            Patch(ref buffer, positions, ConvertToBytes(ratio_double / DEFAULT_AR_DOUBLE));
+            positions = FindSequence(ref buffer, ConvertToBytes(MAX_AR_GUESS_DOUBLE / DEFAULT_AR_DOUBLE)); // 0
+            Patch(ref buffer, positions, ConvertToBytes(ratio_double / DEFAULT_AR_DOUBLE));
+            positions = FindSequence(ref buffer, ConvertToBytes(DEFAULT_AR / MAX_AR_1)); // 59
+            // Some index between 49 and 52 AND also between 55 and 58 makes the game crash or infinite load
+            Patch(ref buffer, positions, 0, 48, ConvertToBytes(DEFAULT_AR / ratio));
+            Patch(ref buffer, positions, 53, 54, ConvertToBytes(DEFAULT_AR / ratio));
+            positions = FindSequence(ref buffer, ConvertToBytes(DEFAULT_AR / MAX_AR_2)); // 0
+            Patch(ref buffer, positions, ConvertToBytes(DEFAULT_AR / ratio));
+            positions = FindSequence(ref buffer, ConvertToBytes(DEFAULT_AR / MAX_AR_GUESS)); // 0
+            Patch(ref buffer, positions, ConvertToBytes(DEFAULT_AR / ratio));
+            positions = FindSequence(ref buffer, ConvertToBytes(MAX_AR_1 / DEFAULT_AR)); // 2
+            Patch(ref buffer, positions, ConvertToBytes(ratio / DEFAULT_AR));
+            positions = FindSequence(ref buffer, ConvertToBytes(MAX_AR_2 / DEFAULT_AR)); // 5
+            Patch(ref buffer, positions, ConvertToBytes(ratio / DEFAULT_AR));
+            positions = FindSequence(ref buffer, ConvertToBytes(MAX_AR_GUESS / DEFAULT_AR)); // 13
+            Patch(ref buffer, positions, ConvertToBytes(ratio / DEFAULT_AR));
+            //TODO unhardcode 32:9 (my AR)
+            positions = FindSequence(ref buffer, ConvertToBytes(MAX_AR_GUESS_H / (double)MAX_AR_GUESS_W)); // 0
+            Patch(ref buffer, positions, ConvertToBytes(16.0 / 32.0));
+            positions = FindSequence(ref buffer, ConvertToBytes(MAX_AR_GUESS_W / (double)MAX_AR_GUESS_H)); // 2
+            Patch(ref buffer, positions, ConvertToBytes(32.0 / 16.0));
+            positions = FindSequence(ref buffer, ConvertToBytes(MAX_AR_GUESS_H / (float)MAX_AR_GUESS_W)); // 0
+            Patch(ref buffer, positions, ConvertToBytes(16.0f / 32.0f));
+            positions = FindSequence(ref buffer, ConvertToBytes(MAX_AR_GUESS_W / (float)MAX_AR_GUESS_H)); // 13
+            Patch(ref buffer, positions, ConvertToBytes(32.0f / 16.0f));*/
 
-            /*//Aspect Ratio Fix #1 (double 16/9): Disabled as it seems to have no effect on UI
-            positions = FindSequence(ref buffer, ConvertToBytes(double_ratio_default), 0);
+            // Aspect Ratio Fix #1 (double 16/9): Disabled as it seems to have no effect on UI
+            /*var positions = FindSequence(ref buffer, ConvertToBytes(DEFAULT_AR_DOUBLE));
 
             if (!AssertEquals("Aspect Ratio Pattern 1", 1, positions.Count))
             {
                 return false;
             }
 
-            var ratio1Patch = ConvertToBytes(doubleRatio);
+            var ratio1Patch = ConvertToBytes((double)patch_ratio);
             Patch(ref buffer, positions, ratio1Patch);*/
+            
+            // First, make sure all the positions are as expected...
 
-            //Aspect Ratio Fix #2 (float 16/9): Changes the UI aspect ratio/scale
-            positions = FindSequence(ref buffer, ConvertToBytes(DEFAULT_AR), 0);
-
-            if (!AssertEquals("Aspect Ratio Pattern 2", 26, positions.Count))
+            var positions2 = FindSequence(ref buffer, ConvertToBytes(DEFAULT_AR));
+            if (!AssertEquals("Aspect Ratio Pattern 2", 26, positions2.Count))
             {
                 return false;
             }
 
-            var ratio2Patch = ConvertToBytes(ratio);
-            int i = 0;
+            var ratio3Pattern = ConvertToBytes((float)DEFAULT_AR_RES_H).Concat(ConvertToBytes((float)DEFAULT_AR_RES_W)).ToArray();
+            var positions3 = FindSequence(ref buffer, ratio3Pattern);
+
+            if (!AssertEquals("Aspect Ratio Pattern 3", 1, positions3.Count))
+            {
+                return false;
+            }
+
+            // Then, apply the patches...
+
+            // Aspect Ratio Fix #2 (float 16/9): Changes the UI aspect ratio/scale
+            var ratio2Patch = ConvertToBytes(patch_ratio);
             // Indexs 0 to 20 and 22 to 25 have no effects on UI.
-            // Only index 21 has an effect, at least in the first released Steam version, so this patch might not be safe after game updates.
-            int i_min = 21;
-            int i_max = 21;
-            foreach (int position in positions)
-            {
-                if (i >= i_min && i <= i_max)
-                    Patch(ref buffer, position, ratio2Patch);
-                ++i;
-            }
+            // Only index 21 has an effect, at least until ver 1.25 (this patch might not be safe for later updates).
+            Patch(ref buffer, positions2, 21, 21, ratio2Patch);
 
-            //Aspect Ratio Fix #3: Scales the UI in a way that I could not understand. The smaller the numbers are, the bigger the UI gets.
-            /*var ratio3Pattern = ConvertToBytes((float)DEFAULT_AR_RES_H).Concat(ConvertToBytes((float)DEFAULT_AR_RES_W)).ToArray();
-            positions = FindSequence(ref buffer, ratio3Pattern, 0);
-
-            if (!AssertEquals("Aspect Ratio Pattern 3", 1, positions.Count))
-            {
-                return false;
-            }
-
+            // Aspect Ratio Fix #3: Scales the UI in some ways, needs to have the same AR as the Fix #2 or it causes UI drifting and stretched UI.
+            // Changing the height seems to have a different effect than changhing the width (they are used differently).
+            // The smaller the numbers are, the bigger the UI gets.
             var ratio3Patch = ConvertToBytes(ratioHeight).Concat(ConvertToBytes(ratioWidth)).ToArray();
-            Patch(ref buffer, positions, ratio3Patch);*/
+            Patch(ref buffer, positions3, ratio3Patch);
+
+            return true;
+        }
+
+        // Had no success with this
+        private static bool PatchFPS(ref byte[] buffer, int targetFPS = 240)
+        {
+            string FPSText = "120";
+            string customFPSText = "240"; // Needs to be of the same length of course
+            var patternFPSText = ConvertToBytes(FPSText);
+            var patchFPSText = ConvertToBytes(customFPSText);
+            var positions_text = FindSequence(ref buffer, patternFPSText);
+            Patch(ref buffer, positions_text, patchFPSText);
+
+            char targetFPSi = (char)targetFPS;
+            float targetFPSf = (float)targetFPS;
+            float targetDTf = 1.0f / targetFPSf;
+            double targetFPSd = (double)targetFPS;
+            double targetDTd = 1.0 / targetFPSd;
+
+            //To review: try char and short. Try little endians?
+            char FPSi = (char)120;
+            float FPSf = 120.0f;
+            float DTf = 1.0f / FPSf;
+            double FPSd = 120.0;
+            double DTd = 1.0 / FPSd;
+            var positions120FPSi = FindSequence(ref buffer, ConvertToBytes(FPSi));
+            //Patch(ref buffer, positions120FPSi, ConvertToBytes(targetFPSi));
+            var positions120FPSf = FindSequence(ref buffer, ConvertToBytes(FPSf));
+            //Patch(ref buffer, positions120FPSf, ConvertToBytes(targetFPSf));
+            var positions120DTf = FindSequence(ref buffer, ConvertToBytes(DTf));
+            //Patch(ref buffer, positions120DTf, ConvertToBytes(targetDTf));
+            var positions120FPSd = FindSequence(ref buffer, ConvertToBytes(FPSd));
+            //Patch(ref buffer, positions120FPSd, ConvertToBytes(targetFPSd));
+            var positions120DTd = FindSequence(ref buffer, ConvertToBytes(DTd));
+            //Patch(ref buffer, positions120DTd, ConvertToBytes(targetDTd));
+            FPSi = (char)60;
+            FPSf = 60.0f;
+            DTf = 1.0f / FPSf;
+            FPSd = 60.0;
+            DTd = 1.0 / FPSd;
+            var positions60FPSi = FindSequence(ref buffer, ConvertToBytes(FPSi));
+            var positions60FPSf = FindSequence(ref buffer, ConvertToBytes(FPSf));
+            var positions60DTf = FindSequence(ref buffer, ConvertToBytes(DTf));
+            var positions60FPSd = FindSequence(ref buffer, ConvertToBytes(FPSd));
+            var positions60DTd = FindSequence(ref buffer, ConvertToBytes(DTd));
+            FPSi = (char)30;
+            FPSf = 30.0f;
+            DTf = 1.0f / FPSf;
+            FPSd = 30.0;
+            DTd = 1.0 / FPSd;
+            var positions30FPSi = FindSequence(ref buffer, ConvertToBytes(FPSi));
+            var positions30FPSf = FindSequence(ref buffer, ConvertToBytes(FPSf));
+            var positions30DTf = FindSequence(ref buffer, ConvertToBytes(DTf));
+            var positions30FPSd = FindSequence(ref buffer, ConvertToBytes(FPSd));
+            var positions30DTd = FindSequence(ref buffer, ConvertToBytes(DTd));
+
+            List<List<int>> FPSi_list = new List<List<int>>();
+            FPSi_list.Add(positions120FPSi);
+            FPSi_list.Add(positions60FPSi);
+            FPSi_list.Add(positions30FPSi);
+            List<List<int>> FPSf_list = new List<List<int>>();
+            FPSf_list.Add(positions120FPSf);
+            FPSf_list.Add(positions60FPSf);
+            FPSf_list.Add(positions30FPSf);
+            List<List<int>> DTf_list = new List<List<int>>();
+            DTf_list.Add(positions120DTf);
+            DTf_list.Add(positions60DTf);
+            DTf_list.Add(positions30DTf);
+            List<List<int>> FPSd_list = new List<List<int>>();
+            FPSd_list.Add(positions120FPSd);
+            FPSd_list.Add(positions60FPSd);
+            FPSd_list.Add(positions30FPSd);
+            List<List<int>> DTd_list = new List<List<int>>();
+            DTd_list.Add(positions120DTd);
+            DTd_list.Add(positions60DTd);
+            DTd_list.Add(positions30DTd);
+            var FPSi_results = FindClosePositions(ref FPSi_list, 64);
+            var FPSf_results = FindClosePositions(ref FPSf_list, 1024);
+            var DTf_results = FindClosePositions(ref DTf_list, 1024);
+            var FPSd_results = FindClosePositions(ref FPSd_list, 1024);
+            var DTd_results = FindClosePositions(ref DTd_list, 1024);
+
+            Patch(ref buffer, FPSi_results[0], ConvertToBytes(targetFPSi));
+            Patch(ref buffer, FPSf_results[0], ConvertToBytes(targetFPSf));
+            Patch(ref buffer, DTf_results[0], ConvertToBytes(targetDTf));
+            Patch(ref buffer, FPSd_results[0], ConvertToBytes(targetFPSd));
+            Patch(ref buffer, DTd_results[0], ConvertToBytes(targetDTd));
 
             return true;
         }
@@ -286,21 +435,20 @@ namespace Nioh2Resolution
             // is the window resolution, the second is the internal resolution.
             var patternResolution720p = ConvertToBytes(1280).Concat(ConvertToBytes(720)).ToArray(); // Found 3 (index 0 and 1 are the good ones)
             var patternResolution1080p = ConvertToBytes(1920).Concat(ConvertToBytes(1080)).ToArray(); // Found 4 (index 1 and 2 are the good ones)
-            var patternResolution1080pUltrawide = ConvertToBytes(1280).Concat(ConvertToBytes(720)).ToArray(); // Found 2
+            var patternResolution1080pUltrawide = ConvertToBytes(2560).Concat(ConvertToBytes(1080)).ToArray(); // Found 2
             var patternResolution1440p = ConvertToBytes(2560).Concat(ConvertToBytes(1440)).ToArray(); // Found 2
             var patternResolution1440pUltrawide = ConvertToBytes(3440).Concat(ConvertToBytes(1440)).ToArray(); // Found 2
             var patternResolution2160p = ConvertToBytes(3840).Concat(ConvertToBytes(2160)).ToArray(); // Found 2
 
             var patternResolution = ConvertToBytes(RES_TO_REPLACE_W).Concat(ConvertToBytes(RES_TO_REPLACE_H)).ToArray();
-
-            // Replace a resolution that is already ultrawide, in case there are some more hardcoded checks (you never know...)
-            // which only calculate the FOV based on the resolution if you selected an ultrawide one.
-            // Plus, at least we already have a base 21:9 aspect ratio to begin win, in case we failed to
-            // patch some aspect ratio values for the UI.
-            var positions = FindSequence(ref buffer, patternResolution, 0);
+            var positions = FindSequence(ref buffer, patternResolution);
+            patternResolution = ConvertToBytes(RES_TO_REPLACE_W).Concat(ConvertToBytes(RES_TO_REPLACE_H)).ToArray();
+            positions = FindSequence(ref buffer, patternResolution);
 
             bool replacing_1280x720 = RES_TO_REPLACE_W == 1280 && RES_TO_REPLACE_H == 720;
             bool replacing_1920x1080 = RES_TO_REPLACE_W == 1920 && RES_TO_REPLACE_H == 1080;
+
+            var resolution = ConvertToBytes(width).Concat(ConvertToBytes(height)).ToArray();
 
             int i1 = 0;
             int i2 = 1;
@@ -324,17 +472,15 @@ namespace Nioh2Resolution
                 return false;
             }
 
-            var resolution = ConvertToBytes(width).Concat(ConvertToBytes(height)).ToArray();
             var windowResolution = resolution;
             var internalResolution = windowResolution;
 
             // Window resolution
             Patch(ref buffer, positions[i1], windowResolution);
-
             // Internal resolution (don't scale it by any value as it can already been scaled from the game settings, and it seems to work even after overwriting resolutions)
             Patch(ref buffer, positions[i2], internalResolution);
 
-            /*// Patch resolution text (doesn't work, text is likely is an asset)
+            /* Patch resolution text (doesn't work, text is likely is an asset, at least english)
             string resolutionText = $"{RES_TO_REPLACE_W} x {RES_TO_REPLACE_H}";
             string customResolutionText = $"{width} x {height}";
             bool ultrawide = (RES_TO_REPLACE_W / (float)RES_TO_REPLACE_H) > 1.78; // 16/9 with tolerance
@@ -345,9 +491,13 @@ namespace Nioh2Resolution
             }
             var patternResolutionText = ConvertToBytes(resolutionText);
             var patchResolutionText = ConvertToBytes(customResolutionText);
-            positions = FindSequence(ref buffer, patternResolutionText, 0);
+            var positions_text = FindSequence(ref buffer, patternResolutionText);
+            Patch(ref buffer, positions_text, patchResolutionText);
 
-            Patch(ref buffer, positions, patchResolutionText);*/
+            patternResolutionText = ConvertToBytes("1440");
+            patchResolutionText = ConvertToBytes($"{height}");
+            positions_text = FindSequence(ref buffer, patternResolutionText);
+            Patch(ref buffer, positions_text, patchResolutionText);*/
 
             return true;
         }
@@ -438,7 +588,31 @@ namespace Nioh2Resolution
             }
         }
 
-        private static byte[] ConvertToBytes(int value)
+        private static byte[] ConvertToBytes(char value)
+        {
+            byte[] bytes = BitConverter.GetBytes(value);
+
+            if (!BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(bytes);
+            }
+
+            return bytes;
+        }
+
+        private static byte[] ConvertToBytes(short value)
+        {
+            byte[] bytes = BitConverter.GetBytes(value);
+
+            if (!BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(bytes);
+            }
+
+            return bytes;
+        }
+
+        private static byte[] ConvertToBytes(Int32 value)
         {
             byte[] bytes = BitConverter.GetBytes(value);
 
@@ -489,8 +663,71 @@ namespace Nioh2Resolution
                 .ToArray();
         }
 
+        private static List<List<int>> FindClosePositions(ref List<List<int>> positions_lists, uint tolerance)
+        {
+            List<List<int>> out_list = new List<List<int>>();
+            foreach (List<int> positions in positions_lists)
+            {
+                out_list.Add(new List<int>());
+            }
+
+            // Limited to 3 lists...
+            int i1 = 0;
+            foreach (List<int> positions1 in positions_lists)
+            {
+                foreach (int position1 in positions1)
+                {
+                    int i2 = 0;
+                    foreach (List<int> positions2 in positions_lists)
+                    {
+                        if (i1 != i2)
+                        {
+                            foreach (int position2 in positions2)
+                            {
+                                if (Math.Abs(position1 - position2) > 0
+                                    && Math.Abs(position1 - position2) <= tolerance)
+                                {
+                                    int i3 = 0;
+                                    foreach (List<int> positions3 in positions_lists)
+                                    {
+                                        if (i1 != i3 && i2 != i3)
+                                        {
+                                            foreach (int position3 in positions3)
+                                            {
+                                                if ((Math.Abs(position1 - position3) > 0
+                                                    && Math.Abs(position1 - position3) <= tolerance)
+                                                    || (Math.Abs(position2 - position3) > 0
+                                                    && Math.Abs(position2 - position3) <= tolerance))
+                                                {
+                                                    if (!out_list[i1].Contains(position1))
+                                                        out_list[i1].Add(position1);
+                                                    if (!out_list[i2].Contains(position2))
+                                                        out_list[i2].Add(position2);
+                                                    if (!out_list[i3].Contains(position3))
+                                                        out_list[i3].Add(position3);
+                                                }
+                                            }
+                                        }
+                                        ++i3;
+                                    }
+                                }
+                            }
+                        }
+                        ++i2;
+                    }
+                }
+                ++i1;
+            }
+            // Actually, keep all the lists in so we know the original order/index
+            //while (out_list.Count > 0 && out_list.First().Count == 0)
+            //    out_list.RemoveAt(0);
+            //while (out_list.Count > 0 && out_list.Last().Count == 0)
+            //    out_list.RemoveAt(out_list.Count - 1);
+            return out_list;
+        }
+
         //Source: https://stackoverflow.com/questions/283456/byte-array-pattern-search
-        private static List<int> FindSequence(ref byte[] buffer, byte[] pattern, int startIndex)
+        private static List<int> FindSequence(ref byte[] buffer, byte[] pattern, int startIndex = 0)
         {
             List<int> positions = new List<int>();
 
@@ -547,6 +784,17 @@ namespace Nioh2Resolution
             foreach (int position in positions)
             {
                 Patch(ref buffer, position, patchBytes);
+            }
+        }
+
+        private static void Patch(ref byte[] buffer, List<int> positions, int i_min, int i_max, byte[] patchBytes)
+        {
+            int i = 0;
+            foreach (int position in positions)
+            {
+                if (i >= i_min && i <= i_max)
+                    Patch(ref buffer, position, patchBytes);
+                ++i;
             }
         }
 
