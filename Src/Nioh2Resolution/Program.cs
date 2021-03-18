@@ -21,6 +21,10 @@ namespace Nioh2Resolution
         private const int DEFAULT_AR_RES_H = 1080;
         private const float DEFAULT_AR = DEFAULT_AR_RES_W / (float)DEFAULT_AR_RES_H;
         private const double DEFAULT_AR_DOUBLE = DEFAULT_AR_RES_W / (double)DEFAULT_AR_RES_H;
+        // Based on recent research, any aspect ratio above this number is treated as widescreen and uses
+        // the widescreen set of UI textures and code.
+        // It's likely that any AR above 2.0 that isn't exactly 64:27 will cause UI drift.
+        private const float MAX_NON_WIDESCREEN_AR = 2.0f;
 
         // "Lower" max supported AR is 64:27 (2.370370...).
         // This is the AR they have hardcoded for Widescreen as far as patch 1.26.
@@ -83,6 +87,7 @@ namespace Nioh2Resolution
                 ask_for_UI_patch = true;
                 ask_for_black_bars = true;
             }
+            // TODO: we should probably replace DEFAULT_AR here with MAX_NON_WIDESCREEN_AR, but it's untested
             else if (ratio - AR_TOLERANCE > DEFAULT_AR && ratio + AR_TOLERANCE < MAX_AR_1)
             {
                 Console.WriteLine("\nYour aspect ratio is in between supported ones (16:9 and 21:9).");
@@ -96,10 +101,11 @@ namespace Nioh2Resolution
 
             if (ask_for_UI_patch || ask_for_black_bars)
             {
-                Console.WriteLine("The UI might not scale or anchor correctly, it might be partially hidden and also drift as you play.");
-                /* This has been disabled for now because while it fixes the UI drifting above 21:9 and also makes the whole UI visible at 16:9, it makes some UI elements unselectable both with a mouse or with a controller, effectively not allowing you to proceed.
                 if (ask_for_UI_patch &&
-                    ReadBool("The UI might not scale or anchor correctly, it might be partially hidden and also drift as you play.\nThere is an EXPERIMANTAL fix available, it might shrink the UI in some places but it will fix the drifting and\nimprove the in game UI.\nWould you like to apply it?", false))
+                    ReadBool("The UI might not scale or anchor correctly, it might be partially hidden and also drift as you play.\n" +
+                    "There is an EXPERIMANTAL fix available, it might shrink the UI in some places but it will fix the drifting and\nimprove the in game UI.\nNOTE THAT DEPENDING ON YOUR ASPECT RATIO THIS WILL BREAK THE MAP SELECTION SCREEN" +
+                    "\n(SOMETIMES YOU CAN STILL MAKE YOUR WAY WITH DIRECTIONAL KEYS),\nbut at the same time it can make other parts of the UI selectable.\n" + 
+                    "For now, a possible solution is to patch the exe twice, one with the UI fix and one without, and switch when having to select a mission.\nWould you like to apply it?", false))
                 {
                     patch_UI = true;
                 }
@@ -110,7 +116,7 @@ namespace Nioh2Resolution
                     {
                         height = (int)Math.Round(width / DEFAULT_AR);
                     }
-                }*/
+                }
             }
 
             if (File.Exists(EXE_FILE_BACKUP))
@@ -221,9 +227,9 @@ namespace Nioh2Resolution
 
         private static bool PatchAspectRatio(ref byte[] buffer, int width, int height, bool patch_UI)
         {
-            if (!patch_UI)
+            if (!patch_UI) // Here in case we wanted to still patch parts of the UI nonetheless
             {
-                return false;
+                return true; // Success
             }
 
             float ratio = width / (float)height;
@@ -236,8 +242,9 @@ namespace Nioh2Resolution
 
             if (ratio < DEFAULT_AR)
             {
-                // Changing patch_ratio and ratioWidth didn't lead me anywhere better
+                // Changing both patch_ratio and ratioWidth didn't seem to work in this case
                 ratioHeight = ratioWidth / ratio;
+                patch_ratio = ratio;
             }
             else
             {
@@ -320,11 +327,12 @@ namespace Nioh2Resolution
             {
                 return false;
             }
-
+            
             // Then, apply the patches...
 
             // Aspect Ratio Fix #2 (float 16/9): Changes the UI aspect ratio/scale
             var ratio2Patch = ConvertToBytes(patch_ratio);
+            // TODO: instead of doing this, we should find a magic pattern around these numbers, or this patch would likely break when new versions of the game are released
             // Indexs 0 to 20 and 22 to 25 have no effects on UI.
             // Only index 21 has an effect, at least until ver 1.25 (this patch might not be safe for later updates).
             Patch(ref buffer, positions2, 21, 21, ratio2Patch);
